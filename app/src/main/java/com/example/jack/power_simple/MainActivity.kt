@@ -13,7 +13,8 @@ import java.io.*
 class MainActivity : AppCompatActivity() {
 
     private lateinit var batteryBroadCase: BroadcastReceiver
-    private val filePath = "/sys/class/power_supply/bms/voltage_ocv"
+    private val ocvPath = "/sys/class/power_supply/bms/voltage_ocv"
+    private val batteryPath = "/sys/class/power_supply/battery/voltage_now"
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,12 +40,35 @@ class MainActivity : AppCompatActivity() {
 
         try {
             // NOTE 讀取檔案 voltage_ocv
-            textFilePath.text = getStringFromFile(filePath)
+            val file = File(ocvPath)
+            if (file.exists()) {
+                textOCV.text = "OCV : " + (getStringFromFile(file).toDouble() / 1000000)
+            } else {
+                textOCV.text = "$ocvPath File Not Exit"
+            }
         } catch (e: Exception) {
             e.printStackTrace()
+            textOCV.text = "Exception ${e.message}"
+        }
+
+        try {
+            // NOTE 讀取檔案 voltage_ocv
+            val file = File(batteryPath)
+            if (file.exists()) {
+                textBatteryPath.text = "Battery : " + (getStringFromFile(file).toDouble() / 1000000)
+            } else {
+                textOCV.text = "$batteryPath File Not Exit"
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            textBatteryPath.text = "Exception ${e.message}"
         }
 
         registerReceiver(batteryBroadCase, intentFilter)
+
+        btnExit.setOnClickListener {
+            finishAndRemoveTask()
+        }
     }
 
     override fun onDestroy() {
@@ -63,15 +87,10 @@ class MainActivity : AppCompatActivity() {
         return sb.toString()
     }
 
-    private fun getStringFromFile(text: String): String {
-        val file = File(text)
-        return if (file.exists()) {
-            val fileInputStream = FileInputStream(file)
-            val ret = convertStreamToString(fileInputStream)
-            fileInputStream.close()
-            ret
-        } else {
-            "File Not Exit"
-        }
+    private fun getStringFromFile(file: File): String {
+        val fileInputStream = FileInputStream(file)
+        val ret = convertStreamToString(fileInputStream)
+        fileInputStream.close()
+        return ret
     }
 }
