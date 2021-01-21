@@ -1,10 +1,8 @@
 package com.example.jack.power_simple
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.android.synthetic.main.activity_main.*
@@ -12,9 +10,10 @@ import java.io.*
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var batteryBroadCase: BroadcastReceiver
-    private val ocvPath = "/sys/class/power_supply/bms/voltage_ocv"
-    private val batteryPath = "/sys/class/power_supply/battery/voltage_now"
+    private val voltageOcv = "/sys/class/power_supply/bms/voltage_ocv"
+    private val voltageNow = "/sys/class/power_supply/battery/voltage_now"
+    private val capacity = "/sys/class/power_supply/bms/capacity"
+    private val handler = Handler(Looper.getMainLooper())
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,58 +21,25 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        val intentFilter = IntentFilter()
-        intentFilter.addAction(Intent.ACTION_BATTERY_CHANGED)
-
-        batteryBroadCase = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                if (intent.action == Intent.ACTION_BATTERY_CHANGED) {
-                    // NOTE Broadcast每秒監聽一次,無法控制
-                    val level = intent.getIntExtra("level", 0)
-                    val scale = intent.getIntExtra("scale", 100)
-
-                    val percentage = (level * 100) / scale
-                    textBattery.text = "$percentage %"
-                }
-            }
-        }
-
-        try {
-            // NOTE 讀取檔案 voltage_ocv
-            val file = File(ocvPath)
-            if (file.exists()) {
-                textOCV.text = "OCV : " + (getStringFromFile(file).toDouble() / 1000000)
-            } else {
-                textOCV.text = "$ocvPath File Not Exit"
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            textOCV.text = "Exception ${e.message}"
-        }
-
-        try {
-            // NOTE 讀取檔案 voltage_ocv
-            val file = File(batteryPath)
-            if (file.exists()) {
-                textBatteryPath.text = "Battery : " + (getStringFromFile(file).toDouble() / 1000000)
-            } else {
-                textOCV.text = "$batteryPath File Not Exit"
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            textBatteryPath.text = "Exception ${e.message}"
-        }
-
-        registerReceiver(batteryBroadCase, intentFilter)
-
         btnExit.setOnClickListener {
             finishAndRemoveTask()
         }
+
+        btnRefresh.setOnClickListener {
+            onVoltageOcv()
+            onVoltageNow()
+            onCapacity()
+        }
+        handler.post(runnable())
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        unregisterReceiver(batteryBroadCase)
+    private fun runnable() = object : Runnable {
+        override fun run() {
+            onVoltageOcv()
+            onVoltageNow()
+            onCapacity()
+            handler.postDelayed(this,30000)
+        }
     }
 
     private fun convertStreamToString(`is`: InputStream): String {
@@ -92,5 +58,47 @@ class MainActivity : AppCompatActivity() {
         val ret = convertStreamToString(fileInputStream)
         fileInputStream.close()
         return ret
+    }
+
+    private fun onVoltageOcv() {
+        try {
+            val file = File(voltageOcv)
+            if (file.exists()) {
+                textOCV.text = "OCV : " + (getStringFromFile(file).toDouble() / 1000000)
+            } else {
+                textOCV.text = "$voltageOcv File Not Exit"
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            textOCV.text = "Exception ${e.message}"
+        }
+    }
+
+    private fun onVoltageNow() {
+        try {
+            val file = File(voltageNow)
+            if (file.exists()) {
+                textBatteryPath.text = "Battery : " + (getStringFromFile(file).toDouble() / 1000000)
+            } else {
+                textBatteryPath.text = "$voltageNow File Not Exit"
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            textBatteryPath.text = "Exception ${e.message}"
+        }
+    }
+
+    private fun onCapacity() {
+        try {
+            val file = File(capacity)
+            if (file.exists()) {
+                textBattery.text = getStringFromFile(file).trim() + " %"
+            } else {
+                textBattery.text = "$capacity File Not Exit"
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            textBattery.text = "Exception ${e.message}"
+        }
     }
 }
