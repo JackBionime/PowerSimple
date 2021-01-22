@@ -7,6 +7,9 @@ import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.*
+import java.text.SimpleDateFormat
+import java.util.*
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -14,13 +17,15 @@ class MainActivity : AppCompatActivity() {
     private val voltageNow = "/sys/class/power_supply/battery/voltage_now"
     private val capacity = "/sys/class/power_supply/bms/capacity"
     private val handler = Handler(Looper.getMainLooper())
-
+    private val powerTxt = "power_simple.csv"
+    private val format = "MM-dd HH:mm:ss"
+    private lateinit var simpleDateFormat: SimpleDateFormat
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
+        simpleDateFormat = SimpleDateFormat(format, Locale.getDefault())
         btnExit.setOnClickListener {
             finishAndRemoveTask()
         }
@@ -30,15 +35,38 @@ class MainActivity : AppCompatActivity() {
             onVoltageNow()
             onCapacity()
         }
+        val title = "Date,SOC,OCV,Battery"
+        writeFile(title)
         handler.post(runnable())
+
+        // TODO Read CSV
+//        btnReadFile.setOnClickListener {
+//            try {
+//                val file = File(applicationContext.getExternalFilesDir(null), powerTxt)
+//                val reader = CSVReader(FileReader(file))
+//                var nextLine: Array<String>? = null
+//                while (reader.readNext().also { nextLine = it } != null) {
+//                    // nextLine[] is an array of values from the line
+//                    Log.d(
+//                        "TestCSV",
+//                        (nextLine?.get(0) ?: "No Line") + (nextLine?.get(1) ?: "No Line") + "etc..."
+//                    )
+//                }
+//            } catch (e: IOException) {
+//                e.printStackTrace()
+//            }
+//        }
     }
 
     private fun runnable() = object : Runnable {
         override fun run() {
-            onVoltageOcv()
-            onVoltageNow()
-            onCapacity()
-            handler.postDelayed(this,30000)
+            val time = simpleDateFormat.format(Date())
+            val capacity = onCapacity()
+            val ocv = onVoltageOcv()
+            val voltageNow = onVoltageNow()
+            val text = "$time,$capacity,$ocv,$voltageNow"
+            writeFile(text)
+            handler.postDelayed(this, 30000)
         }
     }
 
@@ -60,45 +88,63 @@ class MainActivity : AppCompatActivity() {
         return ret
     }
 
-    private fun onVoltageOcv() {
-        try {
+    private fun onVoltageOcv(): String {
+        val message = try {
             val file = File(voltageOcv)
             if (file.exists()) {
-                textOCV.text = "OCV : " + (getStringFromFile(file).toDouble() / 1000000)
+                (getStringFromFile(file).toDouble() / 1000000).toString()
             } else {
-                textOCV.text = "$voltageOcv File Not Exit"
+                "$voltageOcv File Not Exit"
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            textOCV.text = "Exception ${e.message}"
+            "Exception ${e.message}"
         }
+        textOCV.text = "OCV : $message"
+        return message
     }
 
-    private fun onVoltageNow() {
-        try {
+    private fun onVoltageNow(): String {
+        val message = try {
             val file = File(voltageNow)
             if (file.exists()) {
-                textBatteryPath.text = "Battery : " + (getStringFromFile(file).toDouble() / 1000000)
+                (getStringFromFile(file).toDouble() / 1000000).toString()
             } else {
-                textBatteryPath.text = "$voltageNow File Not Exit"
+                "$voltageNow File Not Exit"
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            textBatteryPath.text = "Exception ${e.message}"
+            "Exception ${e.message}"
         }
+        textBatteryPath.text = "Battery : $message"
+        return message
     }
 
-    private fun onCapacity() {
-        try {
+    private fun onCapacity(): String {
+        val message = try {
             val file = File(capacity)
             if (file.exists()) {
-                textBattery.text = getStringFromFile(file).trim() + " %"
+                getStringFromFile(file).trim()
             } else {
-                textBattery.text = "$capacity File Not Exit"
+                "$capacity File Not Exit"
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            textBattery.text = "Exception ${e.message}"
+            "Exception ${e.message}"
+        }
+        textBattery.text = "$message %"
+        return message
+    }
+
+    private fun writeFile(text: String) {
+        val file = File(applicationContext.getExternalFilesDir(null), powerTxt)
+        try {
+            val buf = BufferedWriter(FileWriter(file, true))
+            buf.append(text)
+            buf.newLine()
+            buf.close()
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
         }
     }
 }
